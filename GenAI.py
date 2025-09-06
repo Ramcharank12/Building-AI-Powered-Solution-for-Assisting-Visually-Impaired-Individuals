@@ -4,28 +4,17 @@ from langchain_google_genai import GoogleGenerativeAI
 from PIL import Image, ImageDraw
 from torchvision import transforms
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
-import os
 import torch
 import pytesseract
 from gtts import gTTS
 import tempfile
 import time
-from dotenv import load_dotenv
 
-# Load environment variables from the .env file
-load_dotenv(dotenv_path='/Users/charan/Desktop/Projects/Generative AI-based Assistive Application/GenAI.env')
+# ✅ Configure the Gemini API using Streamlit secrets
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Retrieve the API key from the environment variables
-api_key = os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    raise ValueError("/Users/charan/Desktop/ann/app.env")
-
-# Configure the Gemini API
-genai.configure(api_key=api_key)
-
-# Set Tesseract command path for OCR (Update this path to the correct Tesseract installation location)
-pytesseract.pytesseract.tesseract_cmd = r"/opt/homebrew/bin/tesseract"  # Correct Tesseract path
+# Set Tesseract command path for OCR (Update this path to the correct Tesseract installation location if needed)
+pytesseract.pytesseract.tesseract_cmd = r"/opt/homebrew/bin/tesseract"  # Correct Tesseract path (on your local Mac)
 
 # Streamlit Page Configuration
 st.set_page_config(
@@ -129,11 +118,10 @@ def get_assistance_response(input_prompt, image_data):
     return response.text
 
 # UI Design
-st.sidebar.image("/Users/charan/Desktop/Projects/Generative AI-based Assistive Application/img.jpg", use_container_width=True)
 st.sidebar.header("Upload")
 uploaded_file = st.sidebar.file_uploader("Upload an Image:", type=['jpg', 'jpeg', 'png', 'webp'])
 
-# Display uploaded image on the main page (right-hand side)
+# Display uploaded image on the main page
 if uploaded_file:
     st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
 
