@@ -13,8 +13,8 @@ import time
 # ✅ Configure the Gemini API using Streamlit secrets
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Set Tesseract command path for OCR (Update this path to the correct Tesseract installation location if needed)
-pytesseract.pytesseract.tesseract_cmd = r"/opt/homebrew/bin/tesseract"  # Correct Tesseract path (on your local Mac)
+# Set Tesseract command path for OCR (update if needed)
+pytesseract.pytesseract.tesseract_cmd = r"/opt/homebrew/bin/tesseract"
 
 # Streamlit Page Configuration
 st.set_page_config(
@@ -96,25 +96,40 @@ def text_to_speech(text):
         tts.save(tmp_file.name)
         st.audio(tmp_file.name, format="audio/mp3")
 
-# Converting image to bytes
-def image_to_bytes(uploaded_file):
-    bytes_data = uploaded_file.getvalue()
-    return [{"mime_type": uploaded_file.type, "data": bytes_data}]
+# Function to call Gemini AI for assistance using image description and OCR
+def get_assistance_response(input_prompt, uploaded_file):
+    # Extract text from image (OCR)
+    text_from_image = extract_text_from_image(uploaded_file)
+    
+    # Run object detection to describe objects
+    image = Image.open(uploaded_file)
+    predictions = detect_objects(image)
+    object_desc = ""
+    if predictions['labels'].numel() > 0:
+        object_desc = f"Detected {len(predictions['labels'])} objects: " + ", ".join([str(l.item()) for l in predictions['labels']])
+    else:
+        object_desc = "No significant objects detected in the image."
 
-# Function to call the Gemini AI for personalized assistance
-def get_assistance_response(input_prompt, image_data):
+    # Combine system prompt, user prompt, and image description
     system_prompt = """
-    You are a specialized AI that provides accessibility assistance to visually impaired individuals. Your goal is to:
-    1. Describing images in clear and simple language.
-    2. Detecting objects and obstacles to help with navigation.
-    3. Offering personalized suggestions based on the image content.
-    4. Extracting and reading text from images clearly.
+    You are an AI specialized in assisting visually impaired users. Your goals:
+    1. Describe images clearly and simply.
+    2. Detect objects and obstacles.
+    3. Give suggestions based on image content.
+    4. Extract and read text from images.
     """
 
-    # Combine the system prompt with the user input prompt
-    full_prompt = f"{system_prompt}\n{input_prompt}"
+    full_prompt = (
+        f"{system_prompt}\n"
+        f"User Request: {input_prompt}\n"
+        f"Image Description: {object_desc}\n"
+        f"Extracted Text: {text_from_image}"
+    )
+
+    # Call Gemini text model
     model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content([full_prompt, image_data[0]])
+    response = model.generate_content([full_prompt])
+
     return response.text
 
 # UI Design
@@ -141,9 +156,8 @@ with tab1:
     st.subheader("🏞️ Scene Analysis")
     if uploaded_file:
         with st.spinner("Analyzing Image..."):
-            image_data = image_to_bytes(uploaded_file)
             user_prompt = "Describe this image in detail, briefly, with more text, clearly and concisely for visually impaired individuals."
-            response = get_assistance_response(user_prompt, image_data)
+            response = get_assistance_response(user_prompt, uploaded_file)
             st.write(response)
             text_to_speech(response)
 
@@ -168,9 +182,8 @@ with tab3:
     if uploaded_file:
         st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
         with st.spinner("Analyzing for personalized assistance..."):
-            image_data = image_to_bytes(uploaded_file)
             user_prompt = "Provide detailed assistance based on the uploaded image."
-            response = get_assistance_response(user_prompt, image_data)
+            response = get_assistance_response(user_prompt, uploaded_file)
             st.write(response)
             text_to_speech(response)
 
