@@ -8,3 +8,4 @@ gTTS
 pyttsx3
 Pillow
 numpy
+google-generativeai
