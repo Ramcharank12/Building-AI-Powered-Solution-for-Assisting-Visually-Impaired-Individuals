@@ -7,7 +7,7 @@ import torch
 from gtts import gTTS
 import tempfile
 
-# ✅ Configure Gemini API using Streamlit secrets
+# Configure Gemini API using Streamlit secrets
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # Streamlit Page Configuration
@@ -147,3 +147,4 @@ with tab3:
             response = get_assistance_response(user_prompt, uploaded_file)
             st.write(response)
             text_to_speech(response)
+
