@@ -1,11 +1,8 @@
 streamlit
-opencv-python
-pytesseract
+google-generativeai
+langchain-google-genai
 torch
 torchvision
-transformers
+pillow
+pytesseract
 gTTS
-pyttsx3
-Pillow
-numpy
-google-generativeai
