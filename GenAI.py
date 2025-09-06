@@ -7,10 +7,10 @@ import torch
 from gtts import gTTS
 import tempfile
 
-# Configure Gemini API using Streamlit secrets
+# Configure Gemini API from Streamlit secrets
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Streamlit Page Configuration
+# Streamlit page settings
 st.set_page_config(
     page_title="AI Vision",
     layout="wide",
@@ -18,16 +18,12 @@ st.set_page_config(
 )
 
 # Custom CSS
-st.markdown(
-    """
+st.markdown("""
     <style>
     .main-title {font-size:48px; font-weight:bold; text-align:center; color:#555;}
     .subtitle {font-size:18px; color:#555; text-align:center; margin-bottom:20px;}
-    .feature-header {font-size:24px; color:#333; font-weight:bold;}
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 st.markdown('<div class="main-title"> 👁️‍🗨️Vision AI👁️‍🗨️</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle">Real-Time Scene Understanding, Object Detection, Personalized Assistance, and Text-to-Audio.</div>', unsafe_allow_html=True)
@@ -41,7 +37,7 @@ def load_object_detection_model():
 
 object_detection_model = load_object_detection_model()
 
-# Object Detection Functions
+# Object Detection functions
 def detect_objects(image, threshold=0.3, iou_threshold=0.5):
     transform = transforms.Compose([transforms.ToTensor()])
     img_tensor = transform(image)
@@ -62,23 +58,23 @@ def draw_boxes(image, predictions, threshold=0.5):
             draw.rectangle([x1, y1, x2, y2], outline="yellow", width=5)
     return image
 
-# Convert text to speech
+# Text-to-Speech
 def text_to_speech(text):
     tts = gTTS(text)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
         tts.save(tmp_file.name)
         st.audio(tmp_file.name, format="audio/mp3")
 
-# Gemini AI function (text only)
+# Gemini AI text generation
 def get_assistance_response(input_prompt, uploaded_file):
     image = Image.open(uploaded_file)
     predictions = detect_objects(image)
 
-    # Create a simple textual description from detected objects
+    # Make a simple textual description from detected objects
     if predictions['labels'].numel() > 0:
         object_desc = f"Detected {len(predictions['labels'])} objects: " + ", ".join([str(l.item()) for l in predictions['labels']])
     else:
-        object_desc = "No significant objects detected in the image."
+        object_desc = "No significant objects detected."
 
     system_prompt = """
     You are an AI specialized in assisting visually impaired users. Your goals:
@@ -89,25 +85,25 @@ def get_assistance_response(input_prompt, uploaded_file):
 
     full_prompt = f"{system_prompt}\nUser Request: {input_prompt}\nImage Description: {object_desc}"
 
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    # Generate response
+    model = genai.GenerativeModel("gemini-1.5-flash")  # Change model if needed
     response = model.generate_content([full_prompt])
-
     return response.text
 
-# Sidebar Upload
+# Sidebar file upload
 st.sidebar.header("Upload")
 uploaded_file = st.sidebar.file_uploader("Upload an Image:", type=['jpg', 'jpeg', 'png', 'webp'])
 
 if uploaded_file:
     st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
 
-# Features
+# Features display
 st.markdown(""" 
 ### Features 
-- 🏞️ Scene Analysis: Describe the content of an image. 
-- 🚧 Object Detection: Highlight objects and obstacles.
-- 🤖 Personalized Assistance: AI suggestions based on the image.
-- 📝 Text-to-Speech: Convert descriptions into audio.
+- 🏞️ Scene Analysis
+- 🚧 Object Detection
+- 🤖 Personalized Assistance
+- 📝 Text-to-Speech
 """)
 
 tab1, tab2, tab3 = st.tabs(["Scene Analysis", "Object Detection", "Assistance"])
@@ -117,7 +113,7 @@ with tab1:
     st.subheader("🏞️ Scene Analysis")
     if uploaded_file:
         with st.spinner("Analyzing Image..."):
-            user_prompt = "Describe this image clearly and in detail for visually impaired users."
+            user_prompt = "Describe this image clearly for visually impaired users."
             response = get_assistance_response(user_prompt, uploaded_file)
             st.write(response)
             text_to_speech(response)
@@ -133,9 +129,9 @@ with tab2:
                 image_with_boxes = draw_boxes(image.copy(), predictions)
                 st.image(image_with_boxes, caption="Objects Highlighted", use_container_width=True)
             else:
-                st.write("No objects detected in the image.")
+                st.write("No objects detected.")
         except Exception as e:
-            st.error(f"Error processing the image: {e}")
+            st.error(f"Error processing image: {e}")
 
 # Assistance Tab
 with tab3:
@@ -147,4 +143,3 @@ with tab3:
             response = get_assistance_response(user_prompt, uploaded_file)
             st.write(response)
             text_to_speech(response)
-
