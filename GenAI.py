@@ -1,32 +1,68 @@
 import streamlit as st
 import google.generativeai as genai
+from langchain_google_genai import GoogleGenerativeAI
 from PIL import Image, ImageDraw
 from torchvision import transforms
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
+import os
 import torch
+import pytesseract
 from gtts import gTTS
 import tempfile
+import time
+from dotenv import load_dotenv
 
-# Configure Gemini API from Streamlit secrets
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# Load environment variables from the .env file
+load_dotenv(dotenv_path='/Users/charan/Desktop/Projects/Generative AI-based Assistive Application/GenAI.env')
 
-# Streamlit page settings
+# Retrieve the API key from the environment variables
+api_key = os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    raise ValueError("/Users/charan/Desktop/ann/app.env")
+
+# Configure the Gemini API
+genai.configure(api_key=api_key)
+
+# Set Tesseract command path for OCR (Update this path to the correct Tesseract installation location)
+pytesseract.pytesseract.tesseract_cmd = r"/opt/homebrew/bin/tesseract"  # Correct Tesseract path
+
+# Streamlit Page Configuration
 st.set_page_config(
-    page_title="AI Vision",
+    page_title="AI",
     layout="wide",
     page_icon="🤖",
 )
 
-# Custom CSS
-st.markdown("""
+# Streamlit Layout Custom Styling
+st.markdown(
+    """
     <style>
-    .main-title {font-size:48px; font-weight:bold; text-align:center; color:#555;}
-    .subtitle {font-size:18px; color:#555; text-align:center; margin-bottom:20px;}
+     .main-title {
+        font-size: 48px;
+        font-weight: bold;
+        text-align: center;
+        color: #555;
+        margin-top: -20px;
+     }
+    .subtitle {
+        font-size: 18px;
+        color: #555;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .feature-header {
+        font-size: 24px;
+        color: #333;
+        font-weight: bold;
+    }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 st.markdown('<div class="main-title"> 👁️‍🗨️Vision AI👁️‍🗨️</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Real-Time Scene Understanding, Object Detection, Personalized Assistance, and Text-to-Audio.</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Transforming Lives with AI: Real-Time Scene Understanding, Object Detection, Personalized Assistance, and Converting text into audio output. </div>', unsafe_allow_html=True)
 
 # Load Object Detection Model
 @st.cache_resource
@@ -37,12 +73,12 @@ def load_object_detection_model():
 
 object_detection_model = load_object_detection_model()
 
-# Object Detection functions
 def detect_objects(image, threshold=0.3, iou_threshold=0.5):
     transform = transforms.Compose([transforms.ToTensor()])
     img_tensor = transform(image)
     predictions = object_detection_model([img_tensor])[0]
     keep = torch.ops.torchvision.nms(predictions['boxes'], predictions['scores'], iou_threshold)
+
     filtered_predictions = {
         'boxes': predictions['boxes'][keep],
         'labels': predictions['labels'][keep],
@@ -58,63 +94,68 @@ def draw_boxes(image, predictions, threshold=0.5):
             draw.rectangle([x1, y1, x2, y2], outline="yellow", width=5)
     return image
 
-# Text-to-Speech
+# Text extraction from image
+def extract_text_from_image(uploaded_file):
+    img = Image.open(uploaded_file)
+    extracted_text = pytesseract.image_to_string(img)
+    return extracted_text.strip() or "No text found in the image."
+
+# Converting text to speech
 def text_to_speech(text):
     tts = gTTS(text)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
         tts.save(tmp_file.name)
         st.audio(tmp_file.name, format="audio/mp3")
 
-# Gemini AI text generation
-def get_assistance_response(input_prompt, uploaded_file):
-    image = Image.open(uploaded_file)
-    predictions = detect_objects(image)
+# Converting image to bytes
+def image_to_bytes(uploaded_file):
+    bytes_data = uploaded_file.getvalue()
+    return [{"mime_type": uploaded_file.type, "data": bytes_data}]
 
-    # Make a simple textual description from detected objects
-    if predictions['labels'].numel() > 0:
-        object_desc = f"Detected {len(predictions['labels'])} objects: " + ", ".join([str(l.item()) for l in predictions['labels']])
-    else:
-        object_desc = "No significant objects detected."
-
+# Function to call the Gemini AI for personalized assistance
+def get_assistance_response(input_prompt, image_data):
     system_prompt = """
-    You are an AI specialized in assisting visually impaired users. Your goals:
-    1. Describe images clearly and simply.
-    2. Detect objects and obstacles.
-    3. Give suggestions based on image content.
+    You are a specialized AI that provides accessibility assistance to visually impaired individuals. Your goal is to:
+    1. Describing images in clear and simple language.
+    2. Detecting objects and obstacles to help with navigation.
+    3. Offering personalized suggestions based on the image content.
+    4. Extracting and reading text from images clearly.
     """
 
-    full_prompt = f"{system_prompt}\nUser Request: {input_prompt}\nImage Description: {object_desc}"
-
-    # Generate response
-    model = genai.GenerativeModel("gemini-1.5-flash")  # Change model if needed
-    response = model.generate_content([full_prompt])
+    # Combine the system prompt with the user input prompt
+    full_prompt = f"{system_prompt}\n{input_prompt}"
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    response = model.generate_content([full_prompt, image_data[0]])
     return response.text
 
-# Sidebar file upload
+# UI Design
+st.sidebar.image("/Users/charan/Desktop/Projects/Generative AI-based Assistive Application/img.jpg", use_container_width=True)
 st.sidebar.header("Upload")
 uploaded_file = st.sidebar.file_uploader("Upload an Image:", type=['jpg', 'jpeg', 'png', 'webp'])
 
+# Display uploaded image on the main page (right-hand side)
 if uploaded_file:
     st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
 
-# Features display
+# Declaring the features
 st.markdown(""" 
 ### Features 
-- 🏞️ Scene Analysis
-- 🚧 Object Detection
-- 🤖 Personalized Assistance
-- 📝 Text-to-Speech
+- 🏞️ **Scene Analysis**: Describe the content of an image in brief and detailed. 
+- 🚧 **Object Detection**: Highlight objects and obstacles for navigation.
+- 🤖 **Personalized Assistance**: Generate context-aware suggestions.
+- 📝 **Text-to-Speech**: Convert text into audio outputs. 
 """)
 
-tab1, tab2, tab3 = st.tabs(["Scene Analysis", "Object Detection", "Assistance"])
+tab1, tab2, tab3, tab4 = st.tabs(["Scene Analysis", "Object Detection", "Assistance", "Text-to-Speech"])
 
 # Scene Analysis Tab
 with tab1:
     st.subheader("🏞️ Scene Analysis")
     if uploaded_file:
         with st.spinner("Analyzing Image..."):
-            user_prompt = "Describe this image clearly for visually impaired users."
-            response = get_assistance_response(user_prompt, uploaded_file)
+            image_data = image_to_bytes(uploaded_file)
+            user_prompt = "Describe this image in detail, briefly, with more text, clearly and concisely for visually impaired individuals."
+            response = get_assistance_response(user_prompt, image_data)
             st.write(response)
             text_to_speech(response)
 
@@ -129,17 +170,27 @@ with tab2:
                 image_with_boxes = draw_boxes(image.copy(), predictions)
                 st.image(image_with_boxes, caption="Objects Highlighted", use_container_width=True)
             else:
-                st.write("No objects detected.")
+                st.write("No objects detected in the image.")
         except Exception as e:
-            st.error(f"Error processing image: {e}")
+            st.error(f"Error processing the image: {e}")
 
 # Assistance Tab
 with tab3:
     st.subheader("🤖 Personalized Assistance")
     if uploaded_file:
         st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
-        with st.spinner("Generating AI suggestions..."):
+        with st.spinner("Analyzing for personalized assistance..."):
+            image_data = image_to_bytes(uploaded_file)
             user_prompt = "Provide detailed assistance based on the uploaded image."
-            response = get_assistance_response(user_prompt, uploaded_file)
+            response = get_assistance_response(user_prompt, image_data)
             st.write(response)
             text_to_speech(response)
+
+# Text-to-Speech Tab
+with tab4:
+    st.subheader("📝 Text Extraction and Speech")
+    if uploaded_file:
+        text = extract_text_from_image(uploaded_file)
+        st.write(f"Extracted Text: {text}")
+        if text:
+            text_to_speech(text)
